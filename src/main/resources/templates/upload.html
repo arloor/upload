@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+</head>
+<body>
+
+<div>
+    <table th:each="cell,iterStat : ${files}">
+        <tr>
+            <td style="margin: auto;width: 100%;font-size: 1.3rem" ><a th:text="${cell.name}" th:href="${cell.url}">aa</a></td>
+        </tr>
+    </table>
+</div>
+<br/>
+<br/>
+<br/>
+<br/>
+<p>=========================================</p>
+<div style="line-height: 3em;width: 50%;font-family: 'Microsoft YaHei UI'">
+    <form method="post" action="/uploadfile" enctype="multipart/form-data">
+        <input type="text" hidden name="url" th:value="${#request.getRequestURI()}">
+        <input style="margin: auto;width: 100%;font-size: 1.5rem" type="file" name="file"><br>
+        <input style="margin: auto;font-size: 1.5rem" type="submit" value="确定">
+    </form>
+</div>
+</body>
+</html>
