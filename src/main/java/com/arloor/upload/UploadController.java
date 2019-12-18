@@ -59,7 +59,8 @@ public class UploadController {
 
 
     @GetMapping("/")
-    public String index(Model model) {
+    public String index(Model model,HttpServletRequest request) {
+        log.info(request.getRemoteAddr()+" "+request.getRequestURI());
         model.addAttribute("files", children(parentDir));
         return "upload";
     }
@@ -89,11 +90,7 @@ public class UploadController {
         }
     }
 
-    @GetMapping("/{path1}")
-    public String list(Model model, @PathVariable String path1) {
-        String path = buildPath(path1);
-        return handleList(model,path);
-    }
+
 
 
 
@@ -175,22 +172,35 @@ public class UploadController {
         return "upload-result";
     }
 
-    @GetMapping("/{path1}/{path2}")
-    public String list2(Model model, @PathVariable String path1, @PathVariable String path2) {
-        String path = buildPath(path1, path2);
-        return handleList(model,path);
-    }
+//    @GetMapping("/{path1}")
+//    public String list(Model model, @PathVariable String path1) {
+//        String path = buildPath(path1);
+//        return handleList(model,path);
+//    }
+//
+//    @GetMapping("/{path1}/{path2}")
+//    public String list2(Model model, @PathVariable String path1, @PathVariable String path2) {
+//        String path = buildPath(path1, path2);
+//        return handleList(model,path);
+//    }
+//
+//    @GetMapping("/{path1}/{path2}/{path3}")
+//    public String list3(Model model, @PathVariable String path1, @PathVariable String path2,@PathVariable String path3) {
+//        String path = buildPath(path1, path2, path3);
+//        return handleList(model,path);
+//    }
+//
+//    @GetMapping("/{path1}/{path2}/{path3}/{path4}")
+//    public String list3(Model model, @PathVariable String path1, @PathVariable String path2,@PathVariable String path3,@PathVariable String path4) {
+//        String path = buildPath(path1, path2, path3,path4);
+//        return handleList(model,path);
+//    }
 
-    @GetMapping("/{path1}/{path2}/{path3}")
-    public String list3(Model model, @PathVariable String path1, @PathVariable String path2,@PathVariable String path3) {
-        String path = buildPath(path1, path2, path3);
-        return handleList(model,path);
-    }
+    @GetMapping("/**")
+    public String listsss(Model model,HttpServletRequest request){
+        log.info(request.getRemoteAddr()+" "+request.getRequestURI());
+        return handleList(model,request.getRequestURI());
 
-    @GetMapping("/{path1}/{path2}/{path3}/{path4}")
-    public String list3(Model model, @PathVariable String path1, @PathVariable String path2,@PathVariable String path3,@PathVariable String path4) {
-        String path = buildPath(path1, path2, path3,path4);
-        return handleList(model,path);
     }
 
 }
