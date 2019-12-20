@@ -1,7 +1,7 @@
 package com.arloor.upload;
 
+import com.arloor.upload.aop.Metric;
 import lombok.extern.apachecommons.CommonsLog;
-import org.springframework.beans.factory.annotation.Required;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -11,15 +11,15 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 @Controller
 @CommonsLog
@@ -27,6 +27,13 @@ public class UploadController {
     String userHome = System.getProperty("user.home");
     String parentDirPath = String.format("%s/upload", userHome);
     File parentDir = new File(parentDirPath);
+
+    private static String[] inline_display_types={
+            ".txt",".sh",".json",".log",
+            ".png",".jpg",".jpeg",
+            ".pdf",
+            ".mp4"
+    };
 
     {
         if (!parentDir.exists()) {
@@ -38,19 +45,15 @@ public class UploadController {
         File[] files = dir.listFiles();
         return Arrays.stream(files)
                 .map(cell -> {
-                    String path="/"+parentDir.toPath()
+                    String path=parentDir.toPath()
                             .relativize(cell.toPath())
                             .toString();
                     FileVo fileVo=FileVo.builder()
                             .name((cell.isDirectory()?"___"+cell.getName()+"___":cell.getName()))
-                            .url(path)
+                            .url("/"+path)
                             .build();
                     if(cell.isFile()){
-                        try {
-                            fileVo.setUrl("/download?file="+URLEncoder.encode(path,"UTF-8"));
-                        } catch (UnsupportedEncodingException e) {
-                            e.printStackTrace();
-                        }
+                        fileVo.setUrl("/view/"+urlEncode(path));
                     }
                     return fileVo;
                 })
@@ -58,9 +61,23 @@ public class UploadController {
     }
 
 
+    public static final String urlEncode(String path){
+        path=path.replace("\\","/");
+        String[] pathCells=path.split("/");
+        String encodedPath=Arrays.stream(pathCells).map(pathCell-> {
+            try {
+                return URLEncoder.encode(pathCell,"UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+            return pathCell;
+        }).collect(Collectors.joining("/"));
+        return encodedPath;
+    }
+
     @GetMapping("/")
+    @Metric
     public String index(Model model,HttpServletRequest request) {
-        log.info(request.getRemoteAddr()+" "+request.getRequestURI());
         model.addAttribute("files", children(parentDir));
         return "upload";
     }
@@ -68,6 +85,11 @@ public class UploadController {
 
 
     private String handleList(Model model, String path) {
+        try {
+            path=URLDecoder.decode(path,"UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
         String filePath = String.format("%s%s", parentDirPath, path);
         File file = new File(filePath);
         if(!file.exists()){//路径不存在则报错
@@ -80,25 +102,17 @@ public class UploadController {
                     .toString()).build());
             model.addAttribute("files",files );
             return "upload";
-        }else{//是文件，下载
-            try {
-                return "redirect:/download?file="+URLEncoder.encode(path,"UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-                return "/error";
-            }
+        }else{//是文件，应该走不到的
+            return "redirect:/view"+urlEncode(path);
         }
     }
 
-
-
-
-
-//   http://localhost:8080/download?file=%2F..%2F.ssh%2Fid_rsa
-    @GetMapping("/download")
+    @GetMapping("/view/**")
     @ResponseBody
-    public String down(String file,HttpServletResponse response) throws UnsupportedEncodingException {
-        log.info("下载路径："+file);
+    @Metric
+    public String down(HttpServletRequest request,HttpServletResponse response) throws UnsupportedEncodingException {
+        String file=request.getRequestURI().replace("/view","");
+        file= URLDecoder.decode(file,"UTF-8");
 
         File toDownload = new File(parentDirPath+file);
         //这种想超越预定文件夹，下载其他文件，禁止！
@@ -107,39 +121,46 @@ public class UploadController {
         }
         // 如果文件存在，则进行下载
         if (toDownload.exists()) {
-            // 配置文件下载
-            response.setHeader("content-type", "application/octet-stream");
-            response.setContentType("application/octet-stream");
-            // 下载文件能正常显示中文
-            response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(toDownload.getName(), "UTF-8"));
+//            // 配置文件下载
+//            response.setHeader("content-type", "application/octet-stream");
+//            response.setContentType("application/octet-stream");
+//
+
+            AtomicBoolean inline = new AtomicBoolean(false);
+            Arrays.stream(inline_display_types).forEach((inlineType)->{
+                if(toDownload.getName().contains(inlineType)){
+                    inline.set(true);
+                    response.setHeader("Content-Disposition", "inline");
+                }
+            });
+
+            if(!inline.get()){
+                response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(toDownload.getName(), "UTF-8"));
+            }
+
             // 实现文件下载
             byte[] buffer = new byte[1024];
             FileInputStream fis = null;
             BufferedInputStream bis = null;
             try(ServletOutputStream outputStream=response.getOutputStream()) {
                 long size = Files.copy(toDownload.toPath(),outputStream );
-                log.info(size);
             } catch (IOException e) {
                 e.printStackTrace();
-                return "fail!";
+                return "下载失败!";
             }
         }
         return "";
     }
-    private String buildPath(String... paths) {
-        StringBuffer sb = new StringBuffer();
-        for (String path : paths
-                ) {
-            sb.append("/");
-            sb.append(path);
-        }
-        log.info("路径组合为："+sb.toString());
-        return sb.toString();
-    }
 
 
     @PostMapping("/uploadfile")
-    public String upload(Model model,@RequestParam("file") MultipartFile file,@RequestParam("url") String url) {
+    @Metric
+    public String upload(HttpServletRequest request,Model model,@RequestParam("file") MultipartFile file,@RequestParam("url") String url) {
+        try {
+            url=URLDecoder.decode(url,"UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
         if (file.isEmpty()) {
             return "上传失败，请选择文件";
         }
@@ -161,10 +182,8 @@ public class UploadController {
             //复制文件，如果存在则覆盖
             Files.copy(inputStream, Paths.get(absolutePath));
             String msg = String.format("success: to %s", absolutePath);
-            log.info(msg);
             model.addAttribute("msg",msg);
         } catch (IOException e) {
-            log.error(e.toString(), e);
             model.addAttribute("msg",e.toString());
         }
         model.addAttribute("url",url);
@@ -197,8 +216,8 @@ public class UploadController {
 //    }
 
     @GetMapping("/**")
+    @Metric
     public String listsss(Model model,HttpServletRequest request){
-        log.info(request.getRemoteAddr()+" "+request.getRequestURI());
         return handleList(model,request.getRequestURI());
 
     }
