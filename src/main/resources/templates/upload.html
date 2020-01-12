@@ -5,7 +5,8 @@
     <title>Test</title>
 </head>
 <body>
-
+<h3 th:if="${ip}" th:text="${ip.toString()}">  </h3>
+<br th:if="${ip}" />
 <div>
     <table th:each="cell,iterStat : ${files}">
         <tr>

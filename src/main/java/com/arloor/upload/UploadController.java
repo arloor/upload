@@ -1,6 +1,12 @@
 package com.arloor.upload;
 
 import com.arloor.upload.aop.Metric;
+import com.fasterxml.jackson.databind.util.JSONPObject;
+import com.maxmind.geoip2.DatabaseReader;
+import com.maxmind.geoip2.exception.GeoIp2Exception;
+import com.maxmind.geoip2.model.CityResponse;
+import com.maxmind.geoip2.model.CountryResponse;
+import com.maxmind.geoip2.record.*;
 import lombok.extern.apachecommons.CommonsLog;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,13 +17,14 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
+import java.net.*;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -28,12 +35,56 @@ public class UploadController {
     String parentDirPath = String.format("%s/upload", userHome);
     File parentDir = new File(parentDirPath);
 
-    private static String[] inline_display_types={
-            ".txt",".sh",".json",".log",
-            ".png",".jpg",".jpeg",
-            ".pdf",
-            ".mp4"
-    };
+    @ModelAttribute("ip")
+    public IpVo getInterceptorAdd(HttpServletRequest request) throws IOException {
+        String ip =request.getRemoteAddr();
+        // A File object pointing to your GeoIP2 or GeoLite2 database
+        URL resource = UploadController.class.getClassLoader().getResource("country.mmdb");
+        File database = new File(resource.getFile());
+
+// This creates the DatabaseReader object. To improve performance, reuse
+// the object across lookups. The object is thread-safe.
+        DatabaseReader reader = new DatabaseReader.Builder(database).build();
+
+        InetAddress ipAddress = InetAddress.getByName(ip);
+
+        try {
+            CountryResponse response = reader.country(ipAddress);
+
+            Country country = response.getCountry();
+
+            IpVo ipVo=IpVo.builder()
+                    .ip(ip)
+                    .isoCode(country.getIsoCode())
+                    .name(country.getName())
+                    .nameZhCN(country.getNames().get("zh-CN"))
+                    .build();
+            log.info(ipVo);
+            return ipVo;
+        }catch (GeoIp2Exception e){
+            log.error("geo lite解析失败 "+ip);
+        }
+        return IpVo.builder()
+                .ip(ip)
+                .build();
+    }
+
+
+
+    private static Map<String,String> inlineContentType=new HashMap<>();
+
+    static {
+        //https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
+        inlineContentType.put(".txt","text/plain;charset=utf-8");
+        inlineContentType.put(".sh","text/plain;charset=utf-8");
+        inlineContentType.put(".log","text/plain;charset=utf-8");
+        inlineContentType.put(".json","application/json;charset=utf-8");
+        inlineContentType.put(".png","image/png;charset=utf-8");
+        inlineContentType.put(".jpg","image/jpeg;charset=utf-8");
+        inlineContentType.put(".jpeg","image/jpeg;charset=utf-8");
+        inlineContentType.put(".pdf","application/pdf;charset=utf-8");
+        inlineContentType.put(".mp4","video/mp4;charset=utf-8");
+    }
 
     {
         if (!parentDir.exists()) {
@@ -127,10 +178,11 @@ public class UploadController {
 //
 
             AtomicBoolean inline = new AtomicBoolean(false);
-            Arrays.stream(inline_display_types).forEach((inlineType)->{
+            inlineContentType.keySet().stream().forEach((inlineType)->{
                 if(toDownload.getName().contains(inlineType)){
                     inline.set(true);
                     response.setHeader("Content-Disposition", "inline");
+                    response.setContentType(inlineContentType.get(inlineType));
                 }
             });
 
@@ -174,7 +226,7 @@ public class UploadController {
         File target = new File(filePath);
         //如果存在则跟随时间戳
         if (target.exists()){
-            filePath+= "_"+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+            filePath+= "."+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
             target = new File(filePath);
         }
         String absolutePath = target.getAbsolutePath();
@@ -190,30 +242,6 @@ public class UploadController {
         model.addAttribute("placehold","返回"+url);
         return "upload-result";
     }
-
-//    @GetMapping("/{path1}")
-//    public String list(Model model, @PathVariable String path1) {
-//        String path = buildPath(path1);
-//        return handleList(model,path);
-//    }
-//
-//    @GetMapping("/{path1}/{path2}")
-//    public String list2(Model model, @PathVariable String path1, @PathVariable String path2) {
-//        String path = buildPath(path1, path2);
-//        return handleList(model,path);
-//    }
-//
-//    @GetMapping("/{path1}/{path2}/{path3}")
-//    public String list3(Model model, @PathVariable String path1, @PathVariable String path2,@PathVariable String path3) {
-//        String path = buildPath(path1, path2, path3);
-//        return handleList(model,path);
-//    }
-//
-//    @GetMapping("/{path1}/{path2}/{path3}/{path4}")
-//    public String list3(Model model, @PathVariable String path1, @PathVariable String path2,@PathVariable String path3,@PathVariable String path4) {
-//        String path = buildPath(path1, path2, path3,path4);
-//        return handleList(model,path);
-//    }
 
     @GetMapping("/**")
     @Metric

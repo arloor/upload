@@ -27,17 +27,17 @@ public class MetricAspect {
     //Around上面的切点
     @Around("test()")
     public Object around(ProceedingJoinPoint jp) throws Throwable {
-       Object[] vars= jp.getArgs();
-        Arrays.stream(vars).filter((var)->var instanceof HttpServletRequest).forEach(
-                var->{
-                    HttpServletRequest request=(HttpServletRequest)var;
-                    try {
-                        log.info(request.getRemoteAddr()+" >>>> "+ URLDecoder.decode(request.getRequestURI(),"UTF-8"));
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                    }
-                }
-        );
+//       Object[] vars= jp.getArgs();
+//        Arrays.stream(vars).filter((var)->var instanceof HttpServletRequest).forEach(
+//                var->{
+//                    HttpServletRequest request=(HttpServletRequest)var;
+//                    try {
+//                        log.info(request.getRemoteAddr()+" >>>> "+ URLDecoder.decode(request.getRequestURI(),"UTF-8"));
+//                    } catch (UnsupportedEncodingException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//        );
         return jp.proceed();// 指定被代理对象的原方法
     }
 }
