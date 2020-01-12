@@ -76,18 +76,18 @@ public class UploadController {
                 .build();
     }
 
-    @RequestMapping(value = "/ip",produces = "application/json")
+    @RequestMapping(value = {"/ip/{addr}","/ip"},produces = "application/json")
     @ResponseBody
-    public IpVo ip(@ModelAttribute("ip")IpVo requestIp,@RequestParam(required = false) String ip){
-        if(ip!=null) {
+    public IpVo ip(@ModelAttribute("ip")IpVo requestIp,@PathVariable(required = false) String addr){
+        if(addr!=null) {
             try {
-                InetAddress inetAddress = InetAddress.getByName(ip);
+                InetAddress inetAddress = InetAddress.getByName(addr);
                 CountryResponse response = reader.country(inetAddress);
 
                 Country country = response.getCountry();
 
                 IpVo ipVo = IpVo.builder()
-                        .ip(ip)
+                        .ip(addr)
                         .isoCode(country.getIsoCode())
                         .name(country.getName())
                         .nameZhCN(country.getNames().get("zh-CN"))
@@ -95,14 +95,14 @@ public class UploadController {
                 log.info(ipVo);
                 return ipVo;
             } catch (GeoIp2Exception e) {
-                log.error("geo lite解析失败 " + ip);
+                log.error("geo lite解析失败 " + addr);
             } catch (UnknownHostException e) {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
             return IpVo.builder()
-                    .ip(ip)
+                    .ip(addr)
                     .build();
         } else{
             return requestIp;
