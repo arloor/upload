@@ -87,7 +87,7 @@ public class UploadController {
                 Country country = response.getCountry();
 
                 IpVo ipVo = IpVo.builder()
-                        .ip(addr)
+                        .ip(inetAddress.getHostAddress())
                         .isoCode(country.getIsoCode())
                         .name(country.getName())
                         .nameZhCN(country.getNames().get("zh-CN"))
@@ -102,7 +102,6 @@ public class UploadController {
                 e.printStackTrace();
             }
             return IpVo.builder()
-                    .ip(addr)
                     .build();
         } else{
             return requestIp;
