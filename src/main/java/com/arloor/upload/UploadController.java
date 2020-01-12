@@ -34,17 +34,24 @@ public class UploadController {
     String userHome = System.getProperty("user.home");
     String parentDirPath = String.format("%s/upload", userHome);
     File parentDir = new File(parentDirPath);
+    private static DatabaseReader reader=null;
+
+    static {
+        InputStream resourceAsStream = UploadController.class.getClassLoader().getResourceAsStream("country.mmdb");
+
+// This creates the DatabaseReader object. To improve performance, reuse
+// the object across lookups. The object is thread-safe.
+        try {
+            reader= new DatabaseReader.Builder(resourceAsStream).build();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     @ModelAttribute("ip")
     public IpVo getInterceptorAdd(HttpServletRequest request) throws IOException {
         String ip =request.getRemoteAddr();
         // A File object pointing to your GeoIP2 or GeoLite2 database
-        URL resource = UploadController.class.getClassLoader().getResource("country.mmdb");
-        File database = new File(resource.getFile());
-
-// This creates the DatabaseReader object. To improve performance, reuse
-// the object across lookups. The object is thread-safe.
-        DatabaseReader reader = new DatabaseReader.Builder(database).build();
 
         InetAddress ipAddress = InetAddress.getByName(ip);
 
@@ -67,6 +74,39 @@ public class UploadController {
         return IpVo.builder()
                 .ip(ip)
                 .build();
+    }
+
+    @RequestMapping(value = "/ip",produces = "application/json")
+    @ResponseBody
+    public IpVo ip(@ModelAttribute("ip")IpVo requestIp,@RequestParam(required = false) String ip){
+        if(ip!=null) {
+            try {
+                InetAddress inetAddress = InetAddress.getByName(ip);
+                CountryResponse response = reader.country(inetAddress);
+
+                Country country = response.getCountry();
+
+                IpVo ipVo = IpVo.builder()
+                        .ip(ip)
+                        .isoCode(country.getIsoCode())
+                        .name(country.getName())
+                        .nameZhCN(country.getNames().get("zh-CN"))
+                        .build();
+                log.info(ipVo);
+                return ipVo;
+            } catch (GeoIp2Exception e) {
+                log.error("geo lite解析失败 " + ip);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return IpVo.builder()
+                    .ip(ip)
+                    .build();
+        } else{
+            return requestIp;
+        }
     }
 
 
