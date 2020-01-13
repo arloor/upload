@@ -76,7 +76,7 @@ public class UploadController {
                 .build();
     }
 
-    @RequestMapping(value = {"/ip/{addr}","/ip"},produces = "application/json")
+    @RequestMapping(value = {"/ip/{addr}","/ip"},produces = "application/json;charset=utf-8")
     @ResponseBody
     public IpVo ip(@ModelAttribute("ip")IpVo requestIp,@PathVariable(required = false) String addr){
         if(addr!=null) {
